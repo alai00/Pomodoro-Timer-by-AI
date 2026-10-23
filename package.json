@@ -1,0 +1,12 @@
+{
+  "name": "special-pomodoro",
+  "version": "1.0.0",
+  "description": "特别的番茄钟 — 桌面悬浮球番茄钟",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}

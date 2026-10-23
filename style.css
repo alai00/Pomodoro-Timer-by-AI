@@ -1,0 +1,274 @@
+/* ===== 特别番茄钟 — 浅色暖调（奶白微黄 / 黑字 / 微软雅黑） ===== */
+:root {
+  --bg: rgba(253, 250, 240, 0.96);
+  --border: rgba(180, 160, 120, 0.35);
+  --track: rgba(120, 105, 80, 0.18);
+  --text: #26241E;
+  --text-dim: #6B6555;
+  --accent: #E8B04B;
+  --phase: #8D8574;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: "Microsoft YaHei", "微软雅黑", system-ui, sans-serif;
+  color: var(--text);
+}
+input, button { font-family: inherit; }
+
+body[data-phase="IDLE"]        { --phase: #8D8574; }
+body[data-phase="FOCUS"]       { --phase: #D96C5A; }
+body[data-phase="FOCUS_WAIT"]  { --phase: #D96C5A; }
+body[data-phase="BUFFER"]      { --phase: #D9A441; }
+body[data-phase="BUFFER_WAIT"] { --phase: #D9A441; }
+body[data-phase="BREAK"]       { --phase: #7BA86F; }
+
+/* ===== 悬浮球（72px，窗口 88px）：按住任意位置拖动 ===== */
+#ball {
+  position: absolute;
+  left: 8px; top: 8px;
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #FFFEF8, var(--bg) 72%);
+  border: 1px solid var(--border);
+  box-shadow: 0 3px 12px rgba(120, 100, 60, 0.32);
+  cursor: grab;
+  transition: box-shadow .25s ease;
+}
+#ball:active { cursor: grabbing; }
+body.mode-panel #ball { display: block; }  /* 面板展开时球保持可见 */
+body.docked #ball { display: none; }       /* 收起时球隐藏，显示柱形条 */
+
+.ring { position: absolute; left: 0; top: 0; pointer-events: none; }
+.ring-bg { fill: none; stroke: var(--track); stroke-width: 5; }
+.ring-fg {
+  fill: none;
+  stroke: var(--phase);
+  stroke-width: 5;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 36px 36px;
+  transition: stroke-dashoffset 0.4s linear, stroke .4s ease;
+}
+
+/* 中央信息区（整个球都可拖拽，此处仅显示信息） */
+#ballCore {
+  position: absolute;
+  left: 13px; top: 4px;
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+  pointer-events: none;
+}
+#ballTime { font-size: 14px; font-weight: 700; line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; }
+#ballPhase { font-size: 9px; color: var(--phase); margin-top: 1px; }
+
+/* 快捷开始按钮：点击直接开始计时，无需弹出面板 */
+#ballQuick {
+  position: absolute;
+  left: 27px; top: 51px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(120, 90, 20, 0.3);
+  background: var(--accent);
+  color: #26241E;
+  font-size: 9px; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 4px rgba(120, 100, 60, 0.35);
+}
+#ballQuick:hover { filter: brightness(1.08); }
+
+@keyframes ballPulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+#ball.pulse { animation: ballPulse .45s ease; }
+
+/* ===== 贴边收起：柱形条（与屏幕背景强区分） ===== */
+#dockBar {
+  display: none;
+  position: absolute;
+  top: 4px;
+  width: 22px; height: 80px;
+  align-items: center; justify-content: center;
+  background: linear-gradient(180deg, #F5C86B, #E8A93E);
+  border: 1px solid rgba(140, 100, 20, 0.45);
+  box-shadow: 0 0 12px rgba(232, 176, 75, 0.9), 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+#dockBar::before {           /* 顶部阶段色指示条 */
+  content: '';
+  position: absolute;
+  top: 3px; left: 4px; right: 4px;
+  height: 4px; border-radius: 2px;
+  background: var(--phase);
+  transition: background .4s ease;
+}
+#dockBar span { font-size: 13px; margin-top: 6px; }
+body.docked #dockBar { display: flex; }
+body.dock-left #dockBar { right: 0; border-radius: 4px 10px 10px 4px; }
+body.dock-right #dockBar { left: 0; border-radius: 10px 4px 4px 10px; }
+
+/* ===== 主界面（16:9 横向卡片，尺寸由主进程 inline 指定） ===== */
+#panel {
+  display: none;
+  position: absolute;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 26px rgba(120, 100, 60, 0.30);
+  padding: 9px 11px 10px;
+  flex-direction: column;
+  overflow: hidden;
+}
+body.mode-panel #panel { display: flex; animation: panelIn .16s ease-out; }
+
+@keyframes panelIn {
+  from { opacity: .45; transform: translateY(6px); }
+  to   { opacity: 1;   transform: translateY(0); }
+}
+
+.panel-header {
+  display: flex; align-items: center; gap: 6px;
+  height: 24px;
+  -webkit-app-region: drag;      /* 头部拖拽区 */
+}
+#taskName {
+  flex: 1; min-width: 0;
+  -webkit-app-region: no-drag;
+  background: rgba(120, 105, 80, 0.08);
+  border: 1px solid rgba(120, 105, 80, 0.15);
+  border-radius: 7px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  user-select: text;
+}
+#taskName:focus { border-color: var(--accent); background: rgba(120, 105, 80, 0.05); }
+#btnCollapse {
+  -webkit-app-region: no-drag;
+  width: 20px; height: 20px; flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(120, 105, 80, 0.15);
+  background: rgba(120, 105, 80, 0.08);
+  color: var(--text-dim);
+  font-size: 12px; line-height: 1;
+  cursor: pointer;
+}
+#btnCollapse:hover { background: rgba(120, 105, 80, 0.18); }
+
+/* 中部：左侧时间块 + 右侧按钮列 */
+.p-mid { display: flex; gap: 12px; margin-top: 6px; flex: 1; min-height: 0; align-items: center; }
+.p-time { flex: 1; min-width: 0; }
+.phase-line {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--text-dim);
+  white-space: nowrap; overflow: hidden;
+}
+#phaseLabel { overflow: hidden; text-overflow: ellipsis; }
+#phaseBadge {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--phase);
+  transition: background .4s ease;
+}
+#bigTime {
+  font-size: 34px; font-weight: 600;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.1;
+  margin-top: 2px;
+}
+.progress {
+  height: 5px; border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+  margin-top: 4px;
+}
+#progressFill {
+  height: 100%; width: 0%;
+  border-radius: 3px;
+  background: var(--phase);
+  transition: width .4s linear, background .4s ease;
+}
+.p-btns {
+  display: flex; flex-direction: column; gap: 4px;
+  flex-shrink: 0; width: 84px;
+}
+.p-btns button {
+  height: 24px;
+  border-radius: 7px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s ease, opacity .2s ease;
+}
+#btnStart {
+  background: var(--accent);
+  border: 1px solid rgba(120, 90, 20, 0.22);
+  color: #26241E;
+  font-weight: 600;
+}
+#btnStart:hover { filter: brightness(1.05); }
+#btnRestart, #btnCancel {
+  background: rgba(120, 105, 80, 0.12);
+  border: 1px solid rgba(120, 105, 80, 0.22);
+  color: var(--text);
+}
+#btnRestart:hover, #btnCancel:hover { background: rgba(120, 105, 80, 0.20); }
+.p-btns button:disabled { opacity: .38; cursor: default; }
+
+/* 底部：三列滑块 */
+.p-sliders {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+.sl-head { display: flex; align-items: center; gap: 4px; font-size: 10px; height: 17px; }
+.sl-head label { color: var(--text-dim); flex-shrink: 0; }
+.sl-head input[type=number] {
+  width: 34px; height: 17px; flex-shrink: 0;
+  margin-left: auto;
+  border-radius: 5px;
+  border: 1px solid rgba(120, 105, 80, 0.22);
+  background: rgba(120, 105, 80, 0.06);
+  text-align: center;
+  font-size: 10px;
+  color: var(--text);
+  outline: none;
+  user-select: text;
+}
+.sl-head input[type=number]:focus { border-color: var(--accent); }
+.sl-head .unit { color: var(--text-dim); font-size: 9px; flex-shrink: 0; }
+.p-sliders input[type=range] {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 4px; border-radius: 2px;
+  background: var(--track);
+  outline: none;
+  cursor: pointer;
+  margin-top: 3px;
+}
+.p-sliders input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #FFFDF5;
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 3px rgba(120, 100, 60, 0.35);
+  cursor: pointer;
+}
+
+/* 今日番茄 */
+.count-line {
+  margin-top: auto;
+  padding-top: 4px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; color: var(--text-dim);
+}
+#todayCount { font-size: 12px; color: var(--text); }
